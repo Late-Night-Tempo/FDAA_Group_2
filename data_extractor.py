@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from typing import Optional
 import os
+import math
+
 
 ########## LOAD DATA ##########
 def depack_df(path: Path, key: Optional[str] = None, tag: Optional[str] = None):
@@ -34,30 +36,11 @@ def depack_df(path: Path, key: Optional[str] = None, tag: Optional[str] = None):
     else:
         df_set = df_temp
 
+    # because some files are uniquely strange, capitalize True/False to ensure reading succeeds
+    df_set.loc[:, 'Value'] = df_set['Value'].apply(lambda x: x.replace(':false', ':False').replace(':true', ':True') if isinstance(x, str) else x)
+
     # set value column to dictionary
-    try:
-        df_set.loc[:, "Value"] = df_set["Value"].apply(ast.literal_eval)
-    except Exception as e:
-        # WHAT DO YOU MEAN MALFORMED STRING
-        # IT'S ALL AUTOMATIC
-        # THERE IS NO MALFORMED STRING IN BA SING SE
-        print(path)
-        print(e)
-
-        # Does cool prints but guess waht that takes time so deal with it later
-        # for idx, value in enumerate(df_set['Value']):
-        #     try:
-        #         ast.literal_eval(value)
-        #     except (ValueError, SyntaxError) as e:
-        #         print(f"Error at row {idx}: {repr(value)} - {e}")
-        #         print(df_set['Value'].apply(type).value_counts())
-        #         for i, char in enumerate(value):
-        #             try:
-        #                 ast.literal_eval(value[:i + 1])  # Check incrementally
-        #             except Exception as sub_e:
-        #                 print(f"Fails at position {i}: {repr(char)} - {sub_e}")
-        #                 break  # Stop at the first broken character
-
+    df_set.loc[:, "Value"] = df_set["Value"].apply(ast.literal_eval)
 
     # Convert dictionaries to new df
     df_outer = pd.json_normalize(df_set["Value"])
@@ -114,27 +97,31 @@ for filename in os.listdir(os.getcwd()+"\data\sgar"):
         with open(Path("data\\sgar\\" + filename)) as f:
             data = json.load(f)
 
-        # Extract only heartRateValues
-        heart_rate_values = data.get("heartRateValues", [])
+            # Extract only heartRateValues
+            heart_rate_values = data.get("heartRateValues", [])
 
-        # Convert to DataFrame
-        df_hr_fine_sgar = pd.DataFrame(heart_rate_values, columns=["timestamp", "heartRate"])
+            # Convert to DataFrame
+            df_hr_fine_sgar = pd.DataFrame(heart_rate_values, columns=["timestamp", "heartRate"])
 
-        # Convert timestamp from milliseconds to seconds
-        df_hr_fine_sgar["timestamp"] = df_hr_fine_sgar["timestamp"] // 1000  # Integer division
+            # Convert timestamp from milliseconds to seconds
+            df_hr_fine_sgar["timestamp"] = df_hr_fine_sgar["timestamp"] // 1000  # Integer division
 
-        # Convert timestamp to datetime
-        df_hr_fine_sgar["timestamp"] = pd.to_datetime(df_hr_fine_sgar["timestamp"], unit="s")
+            # Convert timestamp to datetime
+            df_hr_fine_sgar["timestamp"] = pd.to_datetime(df_hr_fine_sgar["timestamp"], unit="s")
 
-        # Display first few rows
-        print(df_hr_fine_sgar.head())
+            # Display first few rows
+            print(df_hr_fine_sgar.head())
 
-    elif "Sleep" in filename:
-        print("sleep")
+            # TODO: determine if necessary to add heart rate zones here, or do later
 
-    elif "walking" in filename:
+    elif "sleep" in filename:
+        df_sleep_sgar = pd.read_json(Path("data\\sgar\\" + filename))
+
+        # TODO: adjust the table so that dats are NOT columns... what is this...??????
+        # print(df_sleep_sgar.head())
+
+    elif "Activities" in filename:
         df_sport_info_sgar = pd.read_csv(Path("data\\sgar\\" + filename))
-        print(df_sport_info_sgar.head())
 
 
 
@@ -146,6 +133,11 @@ for filename in os.listdir(os.getcwd()+"\data\sgar"):
 # df_sport_info: contains information about exercise records
 # df_hr_fine: contains raw measurements of hr throughout the day
 # df_sleep_fine: contains raw measurements of sleep
+# df_weather: contains weather data
+# df_hr_fine_sgar: heartrate data for sgar
+# df_sleep_sgar: sleep data of sgar, try to merge back
+# df_sport_info_sgar: activity information for sgar, try to merge back
+
 
 # Collect overlap times in data
 unique_ids = df_heartrate["Uid"].unique()
@@ -157,19 +149,11 @@ for ids in unique_ids:
     min_times.append(min(df_hr_fine[df_hr_fine["Uid"] == ids]["Time"]))
     max_times.append(max(df_hr_fine[df_hr_fine["Uid"] == ids]["Time"]))
 
-# Print min max days
-print("Overlap", max(min_times), min(max_times))
-
-# Collect time difference
-setup = [max(min_times), min(max_times)]
-datetime_objects = pd.to_datetime(setup)
-time_difference = max(datetime_objects) - min(datetime_objects)
-print(f"Time difference: {time_difference}")
+# Floor and ceil them so that we get only overlap times as much as possible
+min_time = pd.to_datetime(max(min_times)).ceil("D")  # floor to start of day
+max_time = pd.to_datetime(min(max_times)).floor("D")   # ceil to start of next day
 
 
-print(len(df_sport_info))
-
-print(df_sleep.iloc[0])
 
 
 
@@ -179,12 +163,10 @@ print(df_sleep.iloc[0])
 # TODO: note how the app calculates hr zones and include it in report
 
 ## PRIORITY
-# TODO: begin making linregs
 # TODO: get+merge sam dataset
 # TODO: visualizations
 
 
 # Zoltan
 # TODO: linear regressions for RQ
-# TODO: See how to merge weather dataset w/ mi fit data (probably just visualize via date) (tip to zoltan: look for previous 2 weeks, not predictions)
 ## Temperature, humidity, UV index, precipitation... Eindhoven, Tilburg, Eersal
