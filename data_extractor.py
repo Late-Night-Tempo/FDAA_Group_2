@@ -377,13 +377,11 @@ for uid in unique_ids:
         max_times.append(user_data["time"].max())
 
 # Now get the overlap window
-print(min_times)
-print(max_times)
 min_time = pd.to_datetime(max(min_times)).ceil("D")   # Latest start (rounded *up*)
 max_time = pd.to_datetime(min(max_times)).floor("D")  # Earliest end (rounded *down*)
 
 # Test print
-print("Overlap time window:", min_time, "to", max_time)
+# print("Overlap time window:", min_time, "to", max_time)
 
 
 # Check time
