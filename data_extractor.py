@@ -144,8 +144,9 @@ for filename in os.listdir(os.getcwd() + "\data\sgar"):
 # Merge heartrate fine
 df_hr_fine = df_hr_fine.drop(columns=["Sid", "Key", "Time", "Value", "UpdateTime"])
 df_hr_fine_sgar = df_hr_fine_sgar.rename(columns={"timestamp": "time", "heartRate": "bpm"})
-df_hr_fine_sgar["Uid"] = 123645046
+df_hr_fine_sgar["Uid"] = uid_sgar
 df_hr_fine = pd.concat([df_hr_fine, df_hr_fine_sgar], ignore_index=True)
+
 
 # Merge sleep
 # y'all there are so many columns
@@ -362,28 +363,27 @@ df_sleep_fine = df_sleep_fine.drop(columns=["Sid",
 
 
 # Collect overlap times in data
+# This might not actually be calculated correctly given the other dataframes but it is due to Sgar's data
+# Which somehow only measures a day??????
 unique_ids = df_heartrate["Uid"].unique()
-df_list = [df_heartrate, df_sleep, df_sport_info, df_hr_fine, df_sleep_fine]
+df_heartrate['time'] = pd.to_datetime(df_heartrate['time'], errors='coerce')
 min_times = []
 max_times = []
 
-# Ensure all time columns are in datetime format first
-for df in df_list:
-    df["time"] = pd.to_datetime(df["time"], errors='coerce')  # coerce handles bad values
-
-for df in df_list:
-    for uid in unique_ids:
-        user_data = df[df["Uid"] == uid]
-        if not user_data.empty:
-            min_times.append(user_data["time"].min())
-            max_times.append(user_data["time"].max())
+for uid in unique_ids:
+    user_data = df_heartrate[df_heartrate["Uid"] == uid]
+    if not user_data.empty:
+        min_times.append(user_data["time"].min())
+        max_times.append(user_data["time"].max())
 
 # Now get the overlap window
+print(min_times)
+print(max_times)
 min_time = pd.to_datetime(max(min_times)).ceil("D")   # Latest start (rounded *up*)
 max_time = pd.to_datetime(min(max_times)).floor("D")  # Earliest end (rounded *down*)
 
+# Test print
 print("Overlap time window:", min_time, "to", max_time)
-
 
 
 # Check time
@@ -416,7 +416,7 @@ id_wx_match = {8279638506 : "Eindhoven",
 ## hr
 
 # Sort datetime values for sake of use
-df_heartrate['time'] = pd.to_datetime(df_heartrate['time'])
+df_heartrate.loc[:, 'time'] = pd.to_datetime(df_heartrate['time'])
 df_heartrate = df_heartrate.sort_values(by='time')
 
 # Plot one line per UID
@@ -435,7 +435,7 @@ plt.show()
 ## Fine hr
 
 # Sort datetime values for sake of use
-df_hr_fine['time'] = pd.to_datetime(df_hr_fine['time'])
+df_hr_fine.loc[:, 'time'] = pd.to_datetime(df_hr_fine['time'])
 df_hr_fine = df_hr_fine.sort_values(by='time')
 
 # Plot one line per UID
@@ -453,7 +453,7 @@ plt.show()
 ## sleep dur
 
 # Sort datetime values for sake of use
-df_sleep['time'] = pd.to_datetime(df_sleep['time'])
+df_sleep.loc[:, 'time'] = pd.to_datetime(df_sleep['time'])
 df_sleep = df_sleep.sort_values(by='time')
 
 # Plot one line per UID
