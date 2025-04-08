@@ -4,7 +4,6 @@ import json
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import datetime as dt
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from typing import Optional
@@ -89,7 +88,7 @@ for filename in os.listdir(os.getcwd() + "\data"):
         df_hr_fine = pd.concat([df_hr_fine, depack_df(hlthc_fit, key="heart_rate")], ignore_index=True)
         df_sleep_fine = pd.concat([df_sleep_fine, depack_df(hlthc_fit, key="sleep")], ignore_index=True)
 
-    elif "Weather" in filename:
+    elif "weather" in filename:
         df_weather = pd.read_csv(Path("data\\" + filename))
 
 for filename in os.listdir(os.getcwd() + "\data\sgar"):
@@ -117,28 +116,115 @@ for filename in os.listdir(os.getcwd() + "\data\sgar"):
             # TODO: determine if necessary to add heart rate zones here, or do later
 
     elif "sleep" in filename:
-        df_sleep_sgar = pd.read_json(Path("data\\sgar\\" + filename))
 
-        # TODO: adjust the table so that dats are NOT columns... what is this...??????
-        # print(df_sleep_sgar.head())
+        # Load the JSON file
+        with open(Path("data\\sgar\\" + filename)) as f:
+            data = json.load(f)
+
+            # Initialize an empty DataFrame for storing sleep data
+            df_sleep_sgar = pd.DataFrame()
+
+            # Iterate through each date_key in the data
+            for date_key in data:
+                # Extract the sleep data dictionary
+                sleep_vals = data[date_key].get("dailySleepDTO", None)
+                df_sleep_sgar = pd.concat([df_sleep_sgar, pd.DataFrame([sleep_vals])], ignore_index=True)
+
+            # Convert timestamp to datetime for likely relevant columns
+            df_sleep_sgar["sleepStartTimestampLocal"] = pd.to_datetime(df_sleep_sgar["sleepStartTimestampLocal"],
+                                                                       unit="ms")
+            df_sleep_sgar["sleepEndTimestampLocal"] = pd.to_datetime(df_sleep_sgar["sleepEndTimestampLocal"], unit="ms")
+
 
     elif "Activities" in filename:
         df_sport_info_sgar = pd.read_csv(Path("data\\sgar\\" + filename))
 
 #### Merge datasets
 
-# Merge heartrate
+# Merge heartrate fine
 df_hr_fine = df_hr_fine.drop(columns=["Sid", "Key", "Time", "Value", "UpdateTime"])
 df_hr_fine_sgar = df_hr_fine_sgar.rename(columns={"timestamp": "time", "heartRate": "bpm"})
 df_hr_fine_sgar["Uid"] = 123645046
 df_hr_fine = pd.concat([df_hr_fine, df_hr_fine_sgar], ignore_index=True)
 
 # Merge sleep
-# TODO: MErge sleep but it sucks because it's a lot of columns and very little matches
-print(df_sleep.head())
-print(df_sleep.columns)
-print(df_sleep_sgar.head())
-print(df_sleep_sgar.columns)
+# y'all there are so many columns
+
+# Start dropping columns...
+df_sleep = df_sleep.drop(columns=["Sid",
+                                  "Tag",
+                                  "Key",
+                                  "Value",
+                                  "total_turn_over",
+                                  "total_snore",
+                                  "total_snore_disturb",
+                                  "breath_quality",
+                                  "day_sleep_evaluation",
+                                  "segment_details",
+                                  "total_body_move",
+                                  "sleep_manually_duration",
+                                  "total_long_duration",
+                                  "UpdateTime",
+                                  "sleep_stage",
+                                  "sleep_trace_duration",
+                                  "awake_count",
+                                  "long_sleep_evaluation",
+                                  "avg_hr",
+                                  "avg_spo2",
+                                  "max_hr",
+                                  "min_spo2",
+                                  "max_spo2",
+                                  "min_hr",
+                                  ])
+
+df_sleep = df_sleep.rename(columns={"Time": "time"})
+
+# Nans are used instead of 0s for nap, replace for ease of use later
+df_sleep["sleep_nap_duration"] = df_sleep["sleep_nap_duration"].fillna(0)
+
+
+df_sleep_sgar = df_sleep_sgar.drop(columns=["sleepStartTimestampGMT",
+                                            "sleepEndTimestampGMT",
+                                            "autoSleepStartTimestampGMT",
+                                            "autoSleepEndTimestampGMT",
+                                            "unmeasurableSleepSeconds",
+                                            "deviceRemCapable",
+                                            "retro",
+                                            "lowestRespirationValue",
+                                            "highestRespirationValue",
+                                            "averageRespirationValue",
+                                            "id",
+                                            "sleepWindowConfirmed",
+                                            "sleepWindowConfirmationType",
+                                            "sleepQualityTypePK",
+                                            "sleepResultTypePK",
+                                            "sleepEndTimestampLocal",
+                                            "sleepStartTimestampLocal"
+                                            ])
+
+
+# Convert time from seconds to minutes manually
+colnames = ["deepSleepSeconds", "lightSleepSeconds", "remSleepSeconds", "awakeSleepSeconds", "sleepTimeSeconds", "napTimeSeconds"]
+
+for cols in colnames:
+    df_sleep_sgar[cols] = df_sleep_sgar[cols] / 60
+
+df_sleep_sgar = df_sleep_sgar.rename(columns={"userProfilePK": "Uid",
+                                              "deepSleepSeconds": "sleep_deep_duration",
+                                              "lightSleepSeconds": "sleep_light_duration",
+                                              "remSleepSeconds": "sleep_rem_duration",
+                                              "awakeSleepSeconds": "sleep_awake_duration",
+                                              "calendarDate": "time",
+                                              "sleepTimeSeconds": "total_duration",
+                                              "napTimeSeconds": "sleep_nap_duration",
+                                              })
+# Convert calendar date to datetime
+df_sleep_sgar.loc[:, "time"] = df_sleep_sgar["time"].apply(pd.to_datetime)
+
+
+# Merge the dataframes
+df_sleep = pd.concat([df_sleep, df_sleep_sgar], ignore_index=True)
+
 
 # Merge activities and remove an activity that was not measured on a watch
 # Remove not-watch measured activity (probs not gonna be included anyways due to date but i've yet to filter that)
@@ -146,8 +232,8 @@ df_sport_info = df_sport_info[df_sport_info['Sid'].apply(lambda x: isinstance(x,
 
 df_sport_info = df_sport_info.drop(columns=["Sid",
                                             "Key",
-                                            "Time",
                                             "Value",
+                                            "Time", # note that this one gets repeated hence why it is GONE
                                             "UpdateTime",
                                             "vitality",
                                             "cloud_course_source",
@@ -216,8 +302,6 @@ df_sport_info_sgar = df_sport_info_sgar.drop(columns=["Favorite",
                                                       "Avg Cadence"
                                                       ])
 
-
-
 df_sport_info_sgar = df_sport_info_sgar.rename(columns={"Activity Type": "Category",
                                                         "Date": "time",
                                                         "Time": "duration",
@@ -229,47 +313,213 @@ df_sport_info_sgar = df_sport_info_sgar.rename(columns={"Activity Type": "Catego
 # Add UID
 df_sport_info_sgar["Uid"] = uid_sgar
 
+
 # Note that there will be some NaNs due to sgar data not having the columns but I felt the cols were important to keep
 df_sport_info = pd.concat([df_sport_info, df_sport_info_sgar], ignore_index=True)
+
+
+# Column renaming for consistency
+df_heartrate = df_heartrate.rename(columns={"Time": "time"})
+df_sleep_fine = df_sleep_fine.rename(columns={"Time": "time"})
+df_weather = df_weather.rename(columns={"date": "time"})
+
+# Column dropping for other dataframes
+df_heartrate = df_heartrate.drop(columns=["Sid",
+                                          "Tag",
+                                          "Key",
+                                          "Value",
+                                          "UpdateTime",
+                                          "latest_hr.bpm",
+                                          "latest_hr.time",
+                                          "latest_hr.dbKey",
+                                          "latest_hr.dbTime",
+                                          "latest_hr.sid",
+                                          ])
+
+df_sleep_fine = df_sleep_fine.drop(columns=["Sid",
+                                            "Key",
+                                            "Value",
+                                            "UpdateTime",
+                                            "device_bedtime",
+                                            "device_wake_up_time",
+                                            "timezone",
+                                            "version",
+                                            "protoTime",
+                                            "has_rem",
+                                            "has_stage",
+                                            ])
 
 
 ########## PROCESS ##########
 
 #### RELEVANT DFs:
-# df_heartrate: contains aggregated hr data from daily report
+# df_heartrate: contains aggregated hr data from daily report. Not merged with SGAR data!!!!
 # df_sleep: contains aggregated sleep data from daily report
 # df_sport_info: contains information about exercise records
-# df_hr_fine: contains raw measurements of hr throughout the day
-# df_sleep_fine: contains raw measurements of sleep
-# df_weather: contains weather data
-# df_hr_fine_sgar: heartrate data for sgar
-# df_sleep_sgar: sleep data of sgar, try to merge back
-# df_sport_info_sgar: activity information for sgar, try to merge back
+# df_hr_fine: contains raw measurements of hr throughout the day. These are the by-minute measurements!
+# df_sleep_fine: contains raw measurements of sleep. Not merged with SGAR data!!!! Don't recommend for calculations, but items column contains information that makes the sleep graph.
+# df_weather: contains weather data.
 
 
 # Collect overlap times in data
 unique_ids = df_heartrate["Uid"].unique()
+df_list = [df_heartrate, df_sleep, df_sport_info, df_hr_fine, df_sleep_fine]
 min_times = []
 max_times = []
 
-# Collect min and max times for each student
-for ids in unique_ids:
-    min_times.append(min(df_hr_fine[df_hr_fine["Uid"] == ids]["time"]))
-    max_times.append(max(df_hr_fine[df_hr_fine["Uid"] == ids]["time"]))
+# Ensure all time columns are in datetime format first
+for df in df_list:
+    df["time"] = pd.to_datetime(df["time"], errors='coerce')  # coerce handles bad values
 
-# Floor and ceil them so that we get only overlap times as much as possible
-min_time = pd.to_datetime(max(min_times)).ceil("D")  # floor to start of day
-max_time = pd.to_datetime(min(max_times)).floor("D")  # ceil to start of next day
+for df in df_list:
+    for uid in unique_ids:
+        user_data = df[df["Uid"] == uid]
+        if not user_data.empty:
+            min_times.append(user_data["time"].min())
+            max_times.append(user_data["time"].max())
+
+# Now get the overlap window
+min_time = pd.to_datetime(max(min_times)).ceil("D")   # Latest start (rounded *up*)
+max_time = pd.to_datetime(min(max_times)).floor("D")  # Earliest end (rounded *down*)
+
+print("Overlap time window:", min_time, "to", max_time)
+
+
+
+# Check time
+df_heartrate['time'] = pd.to_datetime(df_heartrate['time'])
+df_sleep["time"] = pd.to_datetime(df_sleep["time"])
+df_sport_info["time"] = pd.to_datetime(df_sport_info["time"])
+df_hr_fine["time"] = pd.to_datetime(df_hr_fine["time"])
+df_sleep_fine["time"] = pd.to_datetime(df_sleep_fine["time"])
+df_weather["time"] = pd.to_datetime(df_weather["time"])
+
+#Filter every dataframe to include information from only the min and max time dates
+df_heartrate = df_heartrate[(df_heartrate["time"] >= min_time) & (df_heartrate["time"] <= max_time)]
+df_sleep = df_sleep[(df_sleep["time"] >= min_time) & (df_sleep["time"] <= max_time)]
+df_sport_info = df_sport_info[(df_sport_info["time"] >= min_time) & (df_sport_info["time"] <= max_time)]
+df_hr_fine = df_hr_fine[(df_hr_fine["time"] >= min_time) & (df_hr_fine["time"] <= max_time)]
+df_sleep_fine = df_sleep_fine[(df_sleep_fine["time"] >= min_time) & (df_sleep_fine["time"] <= max_time)]
+df_weather = df_weather[(df_weather["time"] >= min_time) & (df_weather["time"] <= max_time)]
+
+# create dictionary of weather locations for any future use
+id_wx_match = {8279638506 : "Eindhoven",
+               8279777108: "Eindhoven",
+               123645046: "Eindhoven",
+               8280113902: "Tilburg",
+               8279810348: "Eersel"}
+
+
+
+
+##### BEGIN VISUALIZATIONS
+## hr
+
+# Sort datetime values for sake of use
+df_heartrate['time'] = pd.to_datetime(df_heartrate['time'])
+df_heartrate = df_heartrate.sort_values(by='time')
+
+# Plot one line per UID
+plt.figure(figsize=(12, 6))
+for uid, group in df_heartrate.groupby("Uid"):
+    plt.plot(group["time"], group["avg_hr"], label=f"UID {uid}")
+
+plt.xlabel("Time")
+plt.ylabel("Heart Rate")
+plt.title("Average Heart Rate from df_heartrate Over Time by User")
+plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+plt.tight_layout()
+plt.show()
+
+
+## Fine hr
+
+# Sort datetime values for sake of use
+df_hr_fine['time'] = pd.to_datetime(df_hr_fine['time'])
+df_hr_fine = df_hr_fine.sort_values(by='time')
+
+# Plot one line per UID
+plt.figure(figsize=(12, 6))
+for uid, group in df_hr_fine.groupby("Uid"):
+    plt.plot(group["time"], group["bpm"], label=f"UID {uid}")
+
+plt.xlabel("Time")
+plt.ylabel("Heart Rate")
+plt.title("Per-Minute Heartrate from df_hr_fine Over Time by User")
+plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+plt.tight_layout()
+plt.show()
+
+## sleep dur
+
+# Sort datetime values for sake of use
+df_sleep['time'] = pd.to_datetime(df_sleep['time'])
+df_sleep = df_sleep.sort_values(by='time')
+
+# Plot one line per UID
+plt.figure(figsize=(12, 6))
+for uid, group in df_sleep.groupby("Uid"):
+    plt.plot(group["time"], group["total_duration"], label=f"UID {uid}")
+
+plt.xlabel("Time")
+plt.ylabel("Sleep Duration (minutes)")
+plt.title("Sleep Duration from df_sleep Over Time by User")
+plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+plt.tight_layout()
+plt.show()
+
 
 ## If i have time...
 # TODO: it is possible to extract heart rate zone per hour vs. just through the day?
 # TODO: note how the app calculates hr zones and include it in report
 
-## PRIORITY
-# TODO: get+merge sam dataset
-# TODO: visualizations
+
+######### LINEAR MODELS AND OTHER
+#### RELEVANT DFs:
+# df_heartrate: contains aggregated hr data from daily report. Not merged with SGAR data!!!!
+# df_sleep: contains aggregated sleep data from daily report
+# df_sport_info: contains information about exercise records
+# df_hr_fine: contains raw measurements of hr throughout the day. These are the by-minute measurements!
+# df_sleep_fine: contains raw measurements of sleep. Not merged with SGAR data!!!! Don't recommend for calculations, but items column contains information that makes the sleep graph.
+# df_weather: contains weather data.
+
+# NOTE: you can use the id_wx_match in order to determine which user lives where
 
 
-# Zoltan
+# test prints to show contents of each dataframe
+print("################# HEARTRATE #################")
+print(df_heartrate.head())
+print(df_heartrate.columns)
+print(df_heartrate.iloc[0])
+
+print("################# SLEEP #################")
+print(df_sleep.head())
+print(df_sleep.columns)
+print(df_sleep.iloc[0])
+
+print("################# SPORT INFO #################")
+print(df_sport_info.head())
+print(df_sport_info.columns)
+print(df_sport_info.iloc[0])
+
+print("################# HEARTRATE FINE #################")
+print(df_hr_fine.head())
+print(df_hr_fine.columns)
+print(df_hr_fine.iloc[0])
+
+print("################# SLEEP FINE #################")
+print(df_sleep_fine.head())
+print(df_sleep_fine.columns)
+print(df_sleep_fine.iloc[0])
+
+print("################# WEATHER #################")
+print(df_weather.head())
+print(df_weather.columns)
+print(df_weather.iloc[0])
+
+
+
+
+# Your todos...
 # TODO: linear regressions for RQ
 ## Temperature, humidity, UV index, precipitation... Eindhoven, Tilburg, Eersal
