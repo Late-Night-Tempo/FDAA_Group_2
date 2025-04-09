@@ -2,19 +2,11 @@ import ast
 import datetime
 import json
 import pandas as pd
-import numpy as np
 from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 from typing import Optional
 import os
-import math
-import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-import seaborn as sns
-from sklearn import metrics
 
 
 
@@ -389,7 +381,7 @@ min_time = pd.to_datetime(max(min_times)).ceil("D")   # Latest start (rounded *u
 max_time = pd.to_datetime(min(max_times)).floor("D")  # Earliest end (rounded *down*)
 
 # Test print
-# print("Overlap time window:", min_time, "to", max_time)
+print("Overlap time window:", min_time, "to", max_time)
 
 
 # Check time
@@ -663,8 +655,8 @@ print("Model R^2 score on test set:", l_mdl2.score(x_test, y_test))
 
 # Plot: predicted vs actual
 plt.scatter(y_test, y_pred, alpha=0.7)
-plt.xlabel("Actual Values (y_test)")
-plt.ylabel("Predicted Values")
+plt.xlabel("Actual Values (Deep Sleep Duration in Minutes)")
+plt.ylabel("Predicted Values (Deep Sleep Duration in Minutes)")
 plt.title("Predicted Sleep Score via Increased HR Zones \n vs \n Deep Sleep Duration")
 plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], color='red', linestyle='--')  # ideal line
 plt.grid(True)
@@ -719,12 +711,19 @@ y_pred = l_mdl3.predict(x_test)
 # Print R^2 score (how well the model fits)
 print("Model R^2 score on test set:", l_mdl3.score(x_test, y_test))
 
+# Apply the condition to filter both y_pred and y_test
+mask = (y_pred <= 100) & (y_pred >= -50) & (y_test <= 100) & (y_test >= -50)
+
+# Apply the mask to both y_pred and y_test to filter them
+y_pred_filtered = y_pred[mask]
+y_test_filtered = y_test[mask]
+
 # Plot: predicted vs actual
-plt.scatter(y_test, y_pred, alpha=0.7)
-plt.xlabel("Actual Values (y_test)")
-plt.ylabel("Predicted Values")
+plt.scatter(y_test_filtered, y_pred_filtered, alpha=0.7)
+plt.xlabel("Actual Values (Sleep Score)")
+plt.ylabel("Predicted Values (Sleep Score)")
 plt.title("Predicted Sleep Score via Calories and Increased HR Zones \n vs \n Sleep Score")
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], color='red', linestyle='--')  # ideal line
+plt.plot([y_test_filtered.min(), y_test_filtered.max()], [y_test_filtered.min(), y_test_filtered.max()], color='red', linestyle='--')  # ideal line
 plt.grid(True)
 plt.tight_layout()
 plt.show()
