@@ -7,7 +7,7 @@ from typing import Optional
 import os
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-
+import matplotlib.pyplot as plt
 
 
 ########## LOAD DATA ##########
@@ -411,60 +411,60 @@ id_wx_match = {8279638506 : "Eindhoven",
 
 
 # ##### BEGIN VISUALIZATIONS
-# ## hr
-#
-# # Sort datetime values for sake of use
-# df_heartrate.loc[:, 'time'] = pd.to_datetime(df_heartrate['time'])
-# df_heartrate = df_heartrate.sort_values(by='time')
-#
-# # Plot one line per UID
-# plt.figure(figsize=(12, 6))
-# for uid, group in df_heartrate.groupby("Uid"):
-#     plt.plot(group["time"], group["avg_hr"], label=f"UID {uid}")
-#
-# plt.xlabel("Time")
-# plt.ylabel("Heart Rate")
-# plt.title("Average Heart Rate from df_heartrate Over Time by User")
-# plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
-# plt.tight_layout()
-# plt.show()
-#
-#
-# ## Fine hr
-#
-# # Sort datetime values for sake of use
-# # df_hr_fine.loc[:, 'time'] = pd.to_datetime(df_hr_fine['time'])
-# # df_hr_fine = df_hr_fine.sort_values(by='time')
-#
-# # # Plot one line per UID
-# # plt.figure(figsize=(12, 6))
-# # for uid, group in df_hr_fine.groupby("Uid"):
-# #     plt.plot(group["time"], group["bpm"], label=f"UID {uid}")
-# #
-# # plt.xlabel("Time")
-# # plt.ylabel("Heart Rate")
-# # plt.title("Per-Minute Heartrate from df_hr_fine Over Time by User")
-# # plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
-# # plt.tight_layout()
-# # plt.show()
-#
-# ## sleep dur
-#
-# # Sort datetime values for sake of use
-# df_sleep.loc[:, 'time'] = pd.to_datetime(df_sleep['time'])
-# df_sleep = df_sleep.sort_values(by='time')
-#
-# # Plot one line per UID
-# plt.figure(figsize=(12, 6))
-# for uid, group in df_sleep.groupby("Uid"):
-#     plt.plot(group["time"], group["total_duration"], label=f"UID {uid}")
-#
-# plt.xlabel("Time")
-# plt.ylabel("Sleep Duration (minutes)")
-# plt.title("Sleep Duration from df_sleep Over Time by User")
-# plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
-# plt.tight_layout()
-# plt.show()
+## hr
+
+# Sort datetime values for sake of use
+df_heartrate.loc[:, 'time'] = pd.to_datetime(df_heartrate['time'])
+df_heartrate = df_heartrate.sort_values(by='time')
+
+# Plot one line per UID
+plt.figure(figsize=(12, 6))
+for uid, group in df_heartrate.groupby("Uid"):
+    plt.plot(group["time"], group["avg_hr"], label=f"UID {uid}")
+
+plt.xlabel("Date")
+plt.ylabel("Heart Rate (BPM)")
+plt.title("Average Heart Rate Daily by User")
+plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+plt.tight_layout()
+plt.show()
+
+
+## Fine hr
+
+# Sort datetime values for sake of use
+df_hr_fine.loc[:, 'time'] = pd.to_datetime(df_hr_fine['time'])
+df_hr_fine = df_hr_fine.sort_values(by='time')
+
+# Plot one line per UID
+plt.figure(figsize=(12, 6))
+for uid, group in df_hr_fine.groupby("Uid"):
+    plt.plot(group["time"], group["bpm"], label=f"UID {uid}", alpha=0.5)
+
+plt.xlabel("Date")
+plt.ylabel("Heart Rate (BPM)")
+plt.title("Per-Minute Heartrate Per User")
+plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+plt.tight_layout()
+plt.show()
+
+## sleep dur
+
+# Sort datetime values for sake of use
+df_sleep.loc[:, 'time'] = pd.to_datetime(df_sleep['time'])
+df_sleep = df_sleep.sort_values(by='time')
+
+# Plot one line per UID
+plt.figure(figsize=(12, 6))
+for uid, group in df_sleep.groupby("Uid"):
+    plt.plot(group["time"], group["total_duration"], label=f"UID {uid}")
+
+plt.xlabel("Time")
+plt.ylabel("Sleep Duration (minutes)")
+plt.title("Daily Sleep Duration Per User")
+plt.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+plt.tight_layout()
+plt.show()
 
 
 ## If i have time...
@@ -604,9 +604,10 @@ import matplotlib.pyplot as plt
 plt.scatter(y_test, y_pred, alpha=0.7)
 plt.xlabel("Actual Sleep Score")
 plt.ylabel("Predicted Sleep Score")
-plt.title("Predicted vs Actual Sleep Score")
+plt.title("Predicted Sleep Score via HR Zones During Activity \n and Time Between Activity and Beginning of Sleep \n vs \n Sleep Score")
 plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--')
 plt.grid(True)
+plt.tight_layout()
 plt.show()
 
 # Print intercept and coefficients
@@ -657,7 +658,7 @@ print("Model R^2 score on test set:", l_mdl2.score(x_test, y_test))
 plt.scatter(y_test, y_pred, alpha=0.7)
 plt.xlabel("Actual Values (Deep Sleep Duration in Minutes)")
 plt.ylabel("Predicted Values (Deep Sleep Duration in Minutes)")
-plt.title("Predicted Sleep Score via Increased HR Zones \n vs \n Deep Sleep Duration")
+plt.title("Predicted Sleep Score via Increased HR Zones During Day \n vs \n Deep Sleep Duration")
 plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], color='red', linestyle='--')  # ideal line
 plt.grid(True)
 plt.tight_layout()
